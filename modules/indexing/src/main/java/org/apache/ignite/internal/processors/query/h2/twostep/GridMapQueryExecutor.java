@@ -224,10 +224,13 @@ public class GridMapQueryExecutor {
 
         NodeResults nodeRess = resultsForNode(node.id());
 
-        if (!nodeRess.onCancel(qryReqId))
-            return;
+        boolean clear = GridH2QueryContext.clear(ctx.localNodeId(), node.id(), qryReqId, MAP);
 
-        GridH2QueryContext.clear(ctx.localNodeId(), node.id(), qryReqId, MAP);
+        if (!clear) {
+            nodeRess.onCancel(qryReqId);
+
+            GridH2QueryContext.clear(ctx.localNodeId(), node.id(), qryReqId, MAP);
+        }
 
         QueryResults results = nodeRess.results().remove(qryReqId);
 

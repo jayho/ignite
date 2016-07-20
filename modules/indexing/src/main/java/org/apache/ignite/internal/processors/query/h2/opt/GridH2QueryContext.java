@@ -378,26 +378,30 @@ public class GridH2QueryContext {
      * @param nodeId The node who initiated the query.
      * @param qryId The query ID.
      * @param type Query type.
+     * @return {@code True} if context was found.
      */
-    public static void clear(UUID locNodeId, UUID nodeId, long qryId, GridH2QueryType type) {
-        doClear(new Key(locNodeId, nodeId, qryId, type), false);
+    public static boolean clear(UUID locNodeId, UUID nodeId, long qryId, GridH2QueryType type) {
+        return doClear(new Key(locNodeId, nodeId, qryId, type), false);
     }
 
     /**
      * @param key Context key.
      * @param nodeStop Node is stopping.
+     * @return {@code True} if context was found.
      */
-    private static void doClear(Key key, boolean nodeStop) {
+    private static boolean doClear(Key key, boolean nodeStop) {
         assert key.type == MAP : key.type;
 
         GridH2QueryContext x = qctxs.remove(key);
 
         if (x == null)
-            return;
+            return false;
 
         assert x.key.equals(key);
 
         x.clearContext(nodeStop);
+
+        return true;
     }
 
     /**
