@@ -63,6 +63,7 @@
     <Compile Include="Cache\Affinity\AffinityFunctionSpringTest.cs" />
     <Compile Include="Cache\Affinity\AffinityFunctionTest.cs" />
     <Compile Include="Cache\CacheConfigurationTest.cs" />
+    <Compile Include="Cache\Affinity\AffinityFunctionSpringTest.cs" />
     <Compile Include="Cache\CacheDynamicStartTest.cs" />
     <Compile Include="Cache\CacheNearTest.cs" />
     <Compile Include="Cache\CacheTestAsyncWrapper.cs" />
@@ -209,6 +210,9 @@
     <Content Include="Config\cache-query.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Config\Cache\Affinity\affinity-function2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config\Cache\Affinity\affinity-function.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
