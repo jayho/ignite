@@ -980,18 +980,8 @@ public abstract class GridH2IndexBase extends BaseIndex {
             if (pkFirst == null || pkLast == null || !equal(pkFirst, pkLast))
                 return null;
 
-            Object pkAffKeyFirst;
-            Object pkAffKeyLast;
-
-            GridKernalContext ctx = kernalContext();
-
-            try {
-                pkAffKeyFirst = ctx.affinity().affinityKey(cctx.name(), pkFirst.getObject());
-                pkAffKeyLast = ctx.affinity().affinityKey(cctx.name(), pkLast.getObject());
-            }
-            catch (IgniteCheckedException e) {
-                throw new CacheException(e);
-            }
+            Object pkAffKeyFirst = cctx.affinity().affinityKey(pkFirst.getObject());
+            Object pkAffKeyLast = cctx.affinity().affinityKey(pkLast.getObject());
 
             if (pkAffKeyFirst == null || pkAffKeyLast == null)
                 throw new CacheException("Cache key without affinity key.");

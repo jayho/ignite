@@ -788,7 +788,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
             return new GridQueryFieldsResultAdapter(meta, new FieldsIterator(rs));
         }
         finally {
-            GridH2QueryContext.clear(false);
+            GridH2QueryContext.clearThreadLocal();
         }
     }
 
@@ -994,7 +994,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
             return new KeyValIterator(rs);
         }
         finally {
-            GridH2QueryContext.clear(false);
+            GridH2QueryContext.clearThreadLocal();
         }
     }
 
@@ -1139,7 +1139,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
                 }
             }
             finally {
-                GridH2QueryContext.clear(false);
+                GridH2QueryContext.clearThreadLocal();
             }
 
             try {

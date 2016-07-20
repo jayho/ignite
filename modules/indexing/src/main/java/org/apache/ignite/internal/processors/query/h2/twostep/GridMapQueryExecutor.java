@@ -591,7 +591,10 @@ public class GridMapQueryExecutor {
                 }
             }
             finally {
-                GridH2QueryContext.clear(distributedJoins);
+                GridH2QueryContext.clearThreadLocal();
+
+                if (!distributedJoins)
+                    qctx.clearContext(false);
 
                 if (!F.isEmpty(snapshotedTbls)) {
                     for (GridH2Table dataTbl : snapshotedTbls)
@@ -772,25 +775,17 @@ public class GridMapQueryExecutor {
          * @return {@code False} if query was already cancelled.
          */
         boolean cancelled(long qryId) {
-            Boolean old = qryHist.putIfAbsent(qryId, Boolean.TRUE);
-
-            if (old != null) {
-                assert !old;
-
-                return true;
-            }
-
-            return false;
+            return qryHist.get(qryId) != null;
         }
 
         /**
          * @param qryId Query ID.
-         * @return {@code True} if cancelled started query.
+         * @return {@code True} if cancelled.
          */
         boolean onCancel(long qryId) {
             Boolean old = qryHist.putIfAbsent(qryId, Boolean.FALSE);
 
-            return old != null && old;
+            return old == null;
         }
     }
 

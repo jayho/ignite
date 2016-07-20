@@ -198,7 +198,7 @@ public class GridH2QueryContext {
      * @param cctx Cache context.
      * @return Owning node ID.
      */
-    public UUID nodeForPartition(int p, GridCacheContext<?,?> cctx) {
+    public UUID nodeForPartition(int p, GridCacheContext<?, ?> cctx) {
         UUID[] nodeIds = partsNodes;
 
         if (nodeIds == null) {
@@ -206,7 +206,7 @@ public class GridH2QueryContext {
 
             nodeIds = new UUID[cctx.affinity().partitions()];
 
-            for (Map.Entry<UUID,int[]> e : partsMap.entrySet()) {
+            for (Map.Entry<UUID, int[]> e : partsMap.entrySet()) {
                 UUID nodeId = e.getKey();
                 int[] nodeParts = e.getValue();
 
@@ -356,7 +356,7 @@ public class GridH2QueryContext {
          assert qctx.get() == null;
 
          // We need MAP query context to be available to other threads to run distributed joins.
-         if (x.key.type == MAP && qctxs.putIfAbsent(x.key, x) != null)
+         if (x.key.type == MAP && x.distributedJoins() && qctxs.putIfAbsent(x.key, x) != null)
              throw new IllegalStateException("Query context is already set.");
 
          qctx.set(x);
@@ -364,18 +364,13 @@ public class GridH2QueryContext {
 
     /**
      * Drops current thread local context.
-     *
-     * @param onlyThreadLoc Drop only thread local context but keep global.
      */
-    public static void clear(boolean onlyThreadLoc) {
+    public static void clearThreadLocal() {
         GridH2QueryContext x = qctx.get();
 
         assert x != null;
 
         qctx.remove();
-
-        if (!onlyThreadLoc && x.key.type == MAP)
-            doClear(x.key, false);
     }
 
     /**
@@ -400,13 +395,20 @@ public class GridH2QueryContext {
         if (x == null)
             return;
 
-        x.cleared = true;
-
         assert x.key.equals(key);
 
-        x.clearSnapshots();
+        x.clearContext(nodeStop);
+    }
 
-        List<GridReservable> r = x.reservations;
+    /**
+     * @param nodeStop Node is stopping.
+     */
+    public void clearContext(boolean nodeStop) {
+        cleared = true;
+
+        clearSnapshots();
+
+        List<GridReservable> r = reservations;
 
         if (!nodeStop && !F.isEmpty(r)) {
             for (int i = 0; i < r.size(); i++)

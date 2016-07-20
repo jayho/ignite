@@ -713,7 +713,7 @@ public class GridReduceQueryExecutor {
                             resIter = new Iter(res);
                         }
                         finally {
-                            GridH2QueryContext.clear(false);
+                            GridH2QueryContext.clearThreadLocal();
                         }
                     }
                 }
