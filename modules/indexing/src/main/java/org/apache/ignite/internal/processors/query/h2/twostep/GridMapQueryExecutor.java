@@ -552,11 +552,13 @@ public class GridMapQueryExecutor {
                 // Run queries.
                 int i = 0;
 
+                boolean evt = ctx.event().isRecordable(EVT_CACHE_QUERY_EXECUTED);
+
                 for (GridCacheSqlQuery qry : qrys) {
                     ResultSet rs = h2.executeSqlQueryWithTimer(mainCctx.name(), conn, qry.query(),
                         F.asList(qry.parameters()), true);
 
-                    if (ctx.event().isRecordable(EVT_CACHE_QUERY_EXECUTED)) {
+                    if (evt) {
                         ctx.event().record(new CacheQueryExecutedEvent<>(
                             node,
                             "SQL query executed.",

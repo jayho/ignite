@@ -58,8 +58,20 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
         "group by co._key order by cnt desc, co._key";
 
     /** */
+    private static final String QRY_0_BROADCAST = "select co._key, count(*) cnt\n" +
+        "from \"co\".Company co, \"pr\".Product pr, \"pu\".Purchase pu, \"pe\".Person pe \n" +
+        "where pe._key = pu.personId and pu.productId = pr._key and pr.companyId = co._key \n" +
+        "group by co._key order by cnt desc, co._key";
+
+    /** */
     private static final String QRY_1 = "select pr._key, co._key\n" +
         "from \"pr\".Product pr, \"co\".Company co\n" +
+        "where pr.companyId = co._key\n" +
+        "order by co._key, pr._key ";
+
+    /** */
+    private static final String QRY_1_BROADCAST = "select pr._key, co._key\n" +
+        "from \"co\".Company co, \"pr\".Product pr \n" +
         "where pr.companyId = co._key\n" +
         "order by co._key, pr._key ";
 
@@ -145,6 +157,15 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
         return c;
     }
 
+    /** {@inheritDoc} */
+    @Override protected void beforeTestsStarted() throws Exception {
+        super.beforeTestsStarted();
+
+        startGridsMultiThreaded(GRID_CNT);
+
+        fillCaches();
+    }
+
     /**
      *
      */
@@ -175,36 +196,66 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
             pu.put(i, new Purchase(persId, prodId));
         }
     }
-
     /**
      * @throws Exception If failed.
      */
     public void testRestarts() throws Exception {
+        restarts(false);
+    }
+
+    /**
+     * @throws Exception If failed.
+     */
+    public void testRestartsBroadcast() throws Exception {
+        restarts(true);
+    }
+
+    /**
+     * @param broadcastQry If {@code true} tests broadcast query.
+     * @throws Exception If failed.
+     */
+    private void restarts(final boolean broadcastQry) throws Exception {
         int duration = 90 * 1000;
         int qryThreadNum = 4;
         int restartThreadsNum = 2; // 4 + 2 = 6 nodes
         final int nodeLifeTime = 4000;
-        final int logFreq = 1;
-
-        startGridsMultiThreaded(GRID_CNT);
+        final int logFreq = 100;
 
         final AtomicIntegerArray locks = new AtomicIntegerArray(GRID_CNT);
 
-        fillCaches();
+        SqlFieldsQuery qry0 ;
 
-        X.println("Plan: " + grid(0).cache("pu").query(new SqlFieldsQuery("explain " + QRY_0)
-            .setDistributedJoins(true)).getAll());
+        if (broadcastQry)
+            qry0 = new SqlFieldsQuery(QRY_0_BROADCAST).setDistributedJoins(true).setEnforceJoinOrder(true);
+        else
+            qry0 = new SqlFieldsQuery(QRY_0).setDistributedJoins(true);
 
-        final List<List<?>> pRes = grid(0).cache("pu").query(new SqlFieldsQuery(QRY_0)
-            .setDistributedJoins(true)).getAll();
+        String plan = queryPlan(grid(0).cache("pu"), qry0);
+
+        X.println("Plan1: " + plan);
+
+        assertEquals(broadcastQry, plan.contains("batched:broadcast"));
+
+        final List<List<?>> pRes = grid(0).cache("pu").query(qry0).getAll();
 
         Thread.sleep(3000);
 
-        assertEquals(pRes, grid(0).cache("pu").query(new SqlFieldsQuery(QRY_0)
-            .setDistributedJoins(true)).getAll());
+        assertEquals(pRes, grid(0).cache("pu").query(qry0).getAll());
 
-        final List<List<?>> rRes = grid(0).cache("co").query(new SqlFieldsQuery(QRY_1)
-            .setDistributedJoins(true)).getAll();
+        final SqlFieldsQuery qry1;
+
+        if (broadcastQry)
+            qry1 = new SqlFieldsQuery(QRY_1_BROADCAST).setDistributedJoins(true).setEnforceJoinOrder(true);
+        else
+            qry1 = new SqlFieldsQuery(QRY_1).setDistributedJoins(true);
+
+        plan = queryPlan(grid(0).cache("co"), qry1);
+
+        X.println("Plan2: " + plan);
+
+        assertEquals(broadcastQry, plan.contains("batched:broadcast"));
+
+        final List<List<?>> rRes = grid(0).cache("co").query(qry1).getAll();
 
         assertFalse(pRes.isEmpty());
         assertFalse(rRes.isEmpty());
@@ -225,9 +276,14 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
                     while (!locks.compareAndSet(g, 0, 1));
 
                     if (rnd.nextBoolean()) {
-                        IgniteCache<?,?> cache = grid(g).cache("pu");
+                        IgniteCache<?, ?> cache = grid(g).cache("pu");
 
-                        SqlFieldsQuery qry = new SqlFieldsQuery(QRY_0).setDistributedJoins(true);
+                        SqlFieldsQuery qry;
+
+                        if (broadcastQry)
+                            qry = new SqlFieldsQuery(QRY_0_BROADCAST).setDistributedJoins(true).setEnforceJoinOrder(true);
+                        else
+                            qry = new SqlFieldsQuery(QRY_0).setDistributedJoins(true);
 
                         boolean smallPageSize = rnd.nextBoolean();
 
@@ -261,10 +317,16 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
                         }
                     }
                     else {
-                        IgniteCache<?,?> cache = grid(g).cache("co");
+                        IgniteCache<?, ?> cache = grid(g).cache("co");
 
-                        assertEquals(rRes, cache.query(new SqlFieldsQuery(QRY_1)
-                            .setDistributedJoins(true)).getAll());
+                        SqlFieldsQuery qry;
+
+                        if (broadcastQry)
+                            qry = new SqlFieldsQuery(QRY_1_BROADCAST).setDistributedJoins(true).setEnforceJoinOrder(true);
+                        else
+                            qry = new SqlFieldsQuery(QRY_1).setDistributedJoins(true);
+
+                        assertEquals(rRes, cache.query(qry1).getAll());
                     }
 
                     locks.set(g, 0);
@@ -340,9 +402,13 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
      *
      */
     private static class Person implements Serializable {
+        /** */
         @QuerySqlField(index = true)
         int id;
 
+        /**
+         * @param id ID.
+         */
         Person(int id) {
             this.id = id;
         }
@@ -352,12 +418,18 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
      *
      */
     private static class Purchase implements Serializable {
+        /** */
         @QuerySqlField(index = true)
         int personId;
 
+        /** */
         @QuerySqlField(index = true)
         int productId;
 
+        /**
+         * @param personId Person ID.
+         * @param productId Product ID.
+         */
         Purchase(int personId, int productId) {
             this.personId = personId;
             this.productId = productId;
@@ -368,9 +440,13 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
      *
      */
     private static class Company implements Serializable {
+        /** */
         @QuerySqlField(index = true)
         int id;
 
+        /**
+         * @param id ID.
+         */
         Company(int id) {
             this.id = id;
         }
@@ -380,12 +456,18 @@ public class IgniteCacheQueryNodeRestartDistributedJoinSelfTest extends GridComm
      *
      */
     private static class Product implements Serializable {
+        /** */
         @QuerySqlField(index = true)
         int id;
 
+        /** */
         @QuerySqlField(index = true)
         int companyId;
 
+        /**
+         * @param id ID.
+         * @param companyId Company ID.
+         */
         Product(int id, int companyId) {
             this.id = id;
             this.companyId = companyId;
