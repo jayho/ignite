@@ -20,6 +20,7 @@ package org.apache.ignite.internal.processors.query.h2.opt;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -927,13 +928,13 @@ public abstract class GridH2IndexBase extends BaseIndex {
         int batchLookupId;
 
         /** */
-        Map<ClusterNode, RangeStream> rangeStreams;
+        Map<ClusterNode, RangeStream> rangeStreams = Collections.emptyMap();
 
         /** */
         List<ClusterNode> broadcastNodes;
 
         /** */
-        final List<Future<Cursor>> res = new ArrayList<>();
+        List<Future<Cursor>> res = Collections.emptyList();
 
         /** */
         boolean batchFull;
@@ -1005,16 +1006,28 @@ public abstract class GridH2IndexBase extends BaseIndex {
         /** {@inheritDoc} */
         @SuppressWarnings("ForLoopReplaceableByForEach")
         @Override public boolean addSearchRows(SearchRow firstRow, SearchRow lastRow) {
-            if (findCalled) {
-                findCalled = false;
+            if (qctx == null || findCalled) {
+                if (qctx == null) {
+                    // It is the first call after query begin (may be after reuse),
+                    // reinitialize query context and result.
+                    qctx = GridH2QueryContext.get();
+                    res = new ArrayList<>();
 
-                // Cleanup after the previous phase.
-                qctx.putStreams(batchLookupId, null);
+                    assert qctx != null;
+                    assert !findCalled;
+                }
+                else {
+                    // Cleanup after the previous lookup phase.
+                    assert batchLookupId != 0;
+
+                    findCalled = false;
+                    qctx.putStreams(batchLookupId, null);
+                    res.clear();
+                }
 
                 // Reinitialize for the next lookup phase.
                 batchLookupId = qctx.nextBatchLookupId();
                 rangeStreams = new HashMap<>();
-                res.clear();
             }
 
             Object affKey = affColId == -1 ? null : getAffinityKey(firstRow, lastRow);
@@ -1118,18 +1131,21 @@ public abstract class GridH2IndexBase extends BaseIndex {
 
         /** {@inheritDoc} */
         @Override public void reset(boolean beforeQry) {
-            if (beforeQry) {
-                qctx = GridH2QueryContext.get();
-                batchLookupId = qctx.nextBatchLookupId();
-                rangeStreams = new HashMap<>();
-            }
-            else {
-                rangeStreams = null;
-                broadcastNodes = null;
-                batchFull = false;
-                findCalled = false;
-                res.clear();
-            }
+            if (beforeQry || qctx == null) // Query context can be null if addSearchRows was never called.
+                return;
+
+            assert batchLookupId != 0;
+
+            // Do cleanup after the query run.
+            qctx.putStreams(batchLookupId, null);
+            qctx = null; // The same query can be reused multiple times for different query contexts.
+            batchLookupId = 0;
+
+            rangeStreams = Collections.emptyMap();
+            broadcastNodes = null;
+            batchFull = false;
+            findCalled = false;
+            res = Collections.emptyList();
         }
 
         /** {@inheritDoc} */
