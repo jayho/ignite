@@ -64,6 +64,7 @@ import org.apache.ignite.cache.query.annotations.QuerySqlFunction;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.internal.GridKernalContext;
+import org.apache.ignite.internal.GridTopic;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.CacheEntryImpl;
@@ -1676,20 +1677,22 @@ public class IgniteH2Indexing implements GridQueryIndexing {
 
     /**
      * @param topic Topic.
+     * @param topicOrd Topic ordinal for {@link GridTopic}.
      * @param nodes Nodes.
      * @param msg Message.
      * @param specialize Optional closure to specialize message for each node.
-     * @param locNodeHandler Handler for local node.
+     * @param locNodeHnd Handler for local node.
      * @param plc Policy identifying the executor service which will process message.
      * @param runLocParallel Run local handler in parallel thread.
      * @return {@code true} If all messages sent successfully.
      */
     public boolean send(
         Object topic,
+        int topicOrd,
         Collection<ClusterNode> nodes,
         Message msg,
         @Nullable IgniteBiClosure<ClusterNode, Message, Message> specialize,
-        @Nullable final IgniteInClosure2X<ClusterNode, Message> locNodeHandler,
+        @Nullable final IgniteInClosure2X<ClusterNode, Message> locNodeHnd,
         byte plc,
         boolean runLocParallel
     ) {
@@ -1715,7 +1718,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
                         ((GridCacheQueryMarshallable)msg).marshall(marshaller);
                 }
 
-                ctx.io().send(node, topic, msg, plc);
+                ctx.io().send(node, topic, topicOrd, msg, plc);
             }
             catch (IgniteCheckedException e) {
                 ok = false;
@@ -1738,7 +1741,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
                     // We prefer runLocal to runLocalSafe, because the latter can produce deadlock here.
                     ctx.closure().runLocal(new GridPlainRunnable() {
                         @Override public void run() {
-                            locNodeHandler.apply(finalLocNode, finalMsg);
+                            locNodeHnd.apply(finalLocNode, finalMsg);
                         }
                     }, plc).listen(logger);
                 }
@@ -1749,7 +1752,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
                 }
             }
             else
-                locNodeHandler.apply(locNode, msg);
+                locNodeHnd.apply(locNode, msg);
         }
 
         return ok;
@@ -1758,7 +1761,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
     /**
      * @return Serializer.
      */
-    protected JavaObjectSerializer h2Serializer() {
+    private JavaObjectSerializer h2Serializer() {
         return new JavaObjectSerializer() {
                 @Override public byte[] serialize(Object obj) throws Exception {
                     return marshaller.marshal(obj);

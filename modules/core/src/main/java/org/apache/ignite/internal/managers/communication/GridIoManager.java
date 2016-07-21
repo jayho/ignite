@@ -1374,6 +1374,19 @@ public class GridIoManager extends GridManagerAdapter<CommunicationSpi<Serializa
     /**
      * @param node Destination node.
      * @param topic Topic to send the message to.
+     * @param topicOrd GridTopic enumeration ordinal.
+     * @param msg Message to send.
+     * @param plc Type of processing.
+     * @throws IgniteCheckedException Thrown in case of any errors.
+     */
+    public void send(ClusterNode node, Object topic, int topicOrd, Message msg, byte plc)
+        throws IgniteCheckedException {
+        send(node, topic, topicOrd, msg, plc, false, 0, false, null);
+    }
+
+    /**
+     * @param node Destination node.
+     * @param topic Topic to send the message to.
      * @param msg Message to send.
      * @param plc Type of processing.
      * @param timeout Timeout to keep a message on receiving queue.

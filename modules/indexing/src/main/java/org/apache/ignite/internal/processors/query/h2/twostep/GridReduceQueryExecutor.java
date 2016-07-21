@@ -1143,7 +1143,14 @@ public class GridReduceQueryExecutor {
         if (log.isDebugEnabled())
             log.debug("Sending: [msg=" + msg + ", nodes=" + nodes + ", specialize=" + specialize + "]");
 
-        return h2.send(GridTopic.TOPIC_QUERY, nodes, msg, specialize, locNodeHnd, QUERY_POOL, runLocParallel);
+        return h2.send(GridTopic.TOPIC_QUERY,
+            GridTopic.TOPIC_QUERY.ordinal(),
+            nodes,
+            msg,
+            specialize,
+            locNodeHnd,
+            QUERY_POOL,
+            runLocParallel);
     }
 
     /**
